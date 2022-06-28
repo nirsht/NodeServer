@@ -1,0 +1,15 @@
+version: "3.7"
+
+
+services:
+  app:
+    build: ./
+    volumes:
+      - ./:/var/www/app
+    ports:
+      - 5001:5001
+    environment:
+      - NODE_ENV=development
+      - PORT=5001
+    command:
+      sh -c 'node server.js'
