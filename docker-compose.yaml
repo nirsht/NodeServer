@@ -2,7 +2,16 @@ version: "3.7"
 
 
 services:
+  redis:
+   image: redis
+   container_name: cache
+   expose:
+    - 6379
+   command: 
+      redis-server
   app:
+    links:
+      - "redis"
     build: ./
     volumes:
       - ./:/var/www/app
@@ -10,6 +19,7 @@ services:
       - 5001:5001
     environment:
       - NODE_ENV=development
+      - REDIS_URL=redis://cache
       - PORT=5001
     command:
       sh -c 'node server.js'

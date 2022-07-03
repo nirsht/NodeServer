@@ -1,60 +1,35 @@
-const multer = require("multer");
-const csv = require("fast-csv");
-const fs = require("fs");
 const express = require("express");
 const redis = require("redis");
 const { promisify } = require("util");
 
-const redisClient = redis.createClient(process.env.REDIS_URL);
+const PORT = process.env.PORT || 5001;
+const REDIS_URL = process.env.REDIS_URL;
 
 const app = express();
-const PORT = process.env.PORT || 5001;
+const client = redis.createClient();
 
-global.__basedir = __dirname;
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, __basedir + "/uploads/");
-  },
-  filename: (req, file, cb) => {
-    cb(null, file.fieldname + "-" + Date.now() + "-" + file.originalname);
-  },
+client.on("error", function (error) {
+  console.error(error);
 });
 
-const csvFilter = (req, file, cb) => {
-  if (file.mimetype.includes("csv")) {
-    cb(null, true);
-  } else {
-    cb("Please upload csv only.", false);
-  }
-};
-
-const upload = multer({ storage: storage, fileFilter: csvFilter });
-
-app.get("/", function (req, res) {
-  res.send("GET request to homepage");
+app.get("/", (req, res) => {
+  res.send("Hello world");
 });
 
-app.post("/players", upload.single("file"), (req, res) => {
-  if (req.file == undefined) {
-    return res.status(400).send({ message: "Please upload csv file." });
-  }
+// curl http://localhost:5001/store/my-key\?some\=value\&some-other\=other-value
+app.get("/store/:key", async (req, res) => {
+  const { key } = req.params;
+  const value = req.query;
+  await client.connect();
+  await client.set(key, JSON.stringify(value), redis.print);
+  return res.send("success");
+});
 
-  let csvData = [];
-  let filePath = __basedir + "/uploads/" + req.file.filename;
-  fs.createReadStream(filePath)
-    .pipe(csv.parse({ headers: true }))
-    .on("error", (error) => {
-      throw error.message;
-    })
-    .on("data", (row) => {
-      csvData.push(row);
-    })
-    .on("end", () => {
-      console.log("csvData");
-      console.log(csvData);
-      res.send(200);
-    });
+app.get("/:key", async (req, res) => {
+  const { key } = req.params;
+  await client.connect();
+  const rawData = await client.get(key, redis.print);
+  return res.json(JSON.parse(rawData));
 });
 
 app.listen(PORT, () => {
